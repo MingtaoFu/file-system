@@ -22,18 +22,14 @@ nasm: 用来编译汇编语言
 
 只需在linux/OSX系统下，执行```sudo sh command.sh```即可（请先在当前目录下创建一个名为“U”的文件夹）。  
 command.sh的内容
-```
 nasm ipl10.asm -o ipl10.img  //生成img
 nasm -f bin -o haribote.bin haribote.asm  //生成执行程序haribote.bin
 //以下步骤将bin文件放到img中
 mount ipl10.img U   //插入软盘，软盘对应于U文件夹
 cp haribote.bin U   //把bin拷进去
 umount U    //拔出软盘
-```
 这个sh文件写得比较粗糙，容易出错，如果执行时出现了error，请重新执行（warning就无所谓）。  
 执行完成请看一下U文件夹，因为最后执行了拔出软盘的操作，最后U文件夹应该是空的，如果最后发现还有东西，请删除它并重新执行sh命令。  
-**对于这一步原理的讨论，我在coding的讨论中开一个“讨论”吧。**
---------------------
 
 -----------------------------------
 ----更新于2016-05-27-----
