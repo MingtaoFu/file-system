@@ -27,12 +27,9 @@ ORG     0x8200
 %%isBlank:
     cmp %1, 0x20
     je %%end
-    ;mov al, 'y'
-    ;mov ah, 0x0e
-    ;int 0x10
-;mov al, %1
-    ;mov ah, 0x0e
-    ;int 0x10
+%%isDot:
+    cmp %1, 0x2E
+    je %%end
 mov ax, 1
 
 %%end:
@@ -205,6 +202,9 @@ workout:
     mov cl, dl
     ret
 ;------------work out end---
+;------------seek file-------
+
+;------------seek file end---
 ;------------enter dir----------------
 enter_dir:
     mov ax, 15
@@ -212,7 +212,6 @@ enter_dir:
     IO_BIOS ch, dh, cl, 0x02, 1, oneSecFile, next_read
 ;enter_dir_read:
     ret
-    
 ;------------enter dir end----------------
 ;------------read----------------
 ; ch: %1, dh: %2, cl: %3, ah: %4, al: %5, mem: %6,  next: %7
