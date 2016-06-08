@@ -10,20 +10,17 @@ ORG     0x8200
     cmp %1, 48
     jnge %%isLetter_B       ;小于48，则不是数字，判断是否为字母
     cmp %1, 57
-    ;mov al, 'x'
-    ;mov ah, 0x0e
-    ;int 0x10
-    jnge %%end            ;小于57，为数字，直接结束
+    jng %%end            ;小于57，为数字，直接结束
 %%isLetter_B:
     cmp %1, 65
     jnge %%isLetter_S        ;小于65，不是大写字母,判断是否为小写
     cmp %1, 90
-    jnge %%end            ;小于90，是大写字母，直接结束
+    jng %%end            ;小于90，是大写字母，直接结束
 %%isLetter_S:
     cmp %1, 97
     jnge %%isBlank        ;小于97，不是小写字母,判断是否为空格
     cmp %1, 122
-    jnge %%end            ;小于122，是小写字母，直接结束
+    jng %%end            ;小于122，是小写字母，直接结束
 %%isBlank:
     cmp %1, 0x20
     je %%end
@@ -203,6 +200,51 @@ workout:
     ret
 ;------------work out end---
 ;------------seek file-------
+inputed_filename: db "LISA9      "
+seek_name:
+
+mov si, 0
+mov bx, oneSecFile
+seek_name_loop:
+    xor cx, cx
+    loop_compare_char:
+        mov di, cx
+
+        mov ah, [inputed_filename+di]
+        cmp ah, [bx+di]
+
+        jne not_match
+
+        inc cx
+        cmp cx, 11
+        jne loop_compare_char
+
+    ;回车换行
+    mov al, 0x0d
+    mov ah, 0x0e
+    int 0x10
+    mov al, 0x0a
+    mov ah, 0x0e
+    int 0x10
+    jmp found
+
+    not_match:
+        add bx, 32
+
+    add si, 1
+    cmp si, 16
+
+    jl seek_name_loop
+
+    mov al, 'N'
+    mov ah, 0x0e
+    int 0x10
+    ret
+found:
+    mov al, 'Y'
+    mov ah, 0x0e
+    int 0x10
+    ret
 
 ;------------seek file end---
 ;------------enter dir----------------
@@ -216,14 +258,14 @@ enter_dir:
 ;------------read----------------
 ; ch: %1, dh: %2, cl: %3, ah: %4, al: %5, mem: %6,  next: %7
 read:
-IO_BIOS 0, 1, 2, 0x02, 1, oneSecFile, next_read
+    IO_BIOS 0, 1, 2, 0x02, 1, oneSecFile, next_read
+
 next_read:
     
 mov si, 0
 mov bx, oneSecFile
 print_name:
     ;循环判断11个字符，看是不是非目标文件
-    ;flag_invalid db 0
 
     xor cx, cx
     loop_11:
@@ -262,11 +304,6 @@ print_name:
 
     not_print:
         add bx, 32
-
-    ;打印
-    ;mov ah, 0x0e
-    ;mov al, [oneSecFile+64]
-    ;int 0x10
 
     add si, 1
     cmp si, 16
@@ -358,8 +395,10 @@ log:
 
 boot:
     call enter_dir
+    call seek_name
     call fill_fat
     call read
+    call seek_name
     ;call format
     call log
 
