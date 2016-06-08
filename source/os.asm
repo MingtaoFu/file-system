@@ -200,7 +200,7 @@ workout:
     ret
 ;------------work out end---
 ;------------seek file-------
-inputed_filename: db "LISA9      "
+inputed_filename: db "DIR        "
 seek_name:
 
 mov si, 0
@@ -219,6 +219,9 @@ seek_name_loop:
         cmp cx, 11
         jne loop_compare_char
 
+    ;important
+    mov dx, [bx+file.first_clus]
+
     ;回车换行
     mov al, 0x0d
     mov ah, 0x0e
@@ -236,17 +239,47 @@ seek_name_loop:
 
     jl seek_name_loop
 
-    mov al, 'N'
-    mov ah, 0x0e
-    int 0x10
+    ;mov al, 'N'
+    ;mov ah, 0x0e
+    ;int 0x10
+    mov al, 0
     ret
 found:
-    mov al, 'Y'
-    mov ah, 0x0e
-    int 0x10
+    ;mov al, 'Y'
+    ;mov ah, 0x0e
+    ;int 0x10
+    mov al, 1
     ret
 
 ;------------seek file end---
+get_key :
+    mov ah,0x00
+    int 0x16 
+    MOV AH,0x0e
+    int 0x10
+    ;jmp get_key
+    ret
+;------------cd---------------
+cd:
+    call seek_name
+    cmp al, 0
+    je cd_blank
+    mov ax, dx
+    call workout
+    IO_BIOS ch, dh, cl, 0x02, 1, oneSecFile, next_read
+
+    ret
+
+    cd_blank:
+        mov al, "B"
+        mov ah, 0x0e
+        int 0x10
+
+    ret
+
+;------------cd end---------------
+
+
 ;------------enter dir----------------
 enter_dir:
     mov ax, 15
@@ -378,7 +411,6 @@ next:
     ret
 ;------------format end---------------
 
-
 log:
     mov ah, 0x0e
     mov al, ' '
@@ -394,10 +426,12 @@ log:
     ret
 
 boot:
-    call enter_dir
-    call seek_name
-    call fill_fat
+    ;call get_key
+;    call enter_dir
     call read
+    call cd
+    call fill_fat
+    ;call read
     call seek_name
     ;call format
     call log
