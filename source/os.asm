@@ -5,9 +5,7 @@ ORG     0x8200
 ;section .data
 
 %macro judge_char 1
-
     xor ax, ax
-
 %%isNumber:
     cmp %1, 48
     jnge %%isLetter_B       ;小于48，则不是数字，判断是否为字母
@@ -37,11 +35,56 @@ ORG     0x8200
     ;int 0x10
 mov ax, 1
 
-%%end: 
-    
+%%end:
 %endmacro
 
+; ch: %1, dh: %2, cl: %3, ah: %4, al: %5, mem: %6,  next: %7
+%macro IO_BIOS 7
+mov si, 0
+%%retry_IO:
+    mov ax, 0
+    mov es, ax
+    mov ch, %1
+    mov dh, %2
+    mov cl, %3       ;初始扇区是cl=1 而不是0
 
+    mov ah, %4
+    mov al, %5
+
+    mov bx, %6
+    mov dl, 0x01
+    int 0x13
+    jnc %7
+
+    add si, 1
+    cmp si, 5
+
+    jae %%error_IO
+
+    MOV AH,0x00
+    MOV DL,0x01; A驱动器
+    INT 0x13; 重置驱动器
+
+    jmp %%retry_IO
+
+%%error_IO:
+    mov al, ah
+    MOV AH,0x0e
+    int 0x10
+
+    mov ah, 0x0e
+    mov al, ' '
+    int 0x10
+    mov al, 'e'
+    int 0x10
+    mov al, 'r'
+    int 0x10
+    mov al, 'r'
+    int 0x10
+    mov al, ' '
+    int 0x10
+
+%endmacro
 
 ;-----------------first sector content------
 fatContent:
@@ -141,53 +184,40 @@ error_fat:
 next_fat:
     ret
 ;------------fill fat end----------------
+;------------work out position in disk---
+; 33: 2        sector = cluster + 31
+; cluster in ax
+workout:
+    add ax, 31      ;扇区号放在ax中
+    cwd
+    mov cx, 36
+    idiv cx
+    ;商在ax，余数在dx
+    ;ax为得到的柱面号
+    mov ch, al
+    inc dx
+    cmp dx, 19
+    mov dh, 0
+    jl finish
+    sub dl, 18
+    mov dh ,1
+    finish:
+    mov cl, dl
+    ret
+;------------work out end---
+;------------enter dir----------------
+enter_dir:
+    mov ax, 15
+    call workout
+    IO_BIOS ch, dh, cl, 0x02, 1, oneSecFile, next_read
+;enter_dir_read:
+    ret
+    
+;------------enter dir end----------------
 ;------------read----------------
+; ch: %1, dh: %2, cl: %3, ah: %4, al: %5, mem: %6,  next: %7
 read:
-mov si, 0
-retry_read:
-    mov ax, 0
-    mov es, ax
-    mov ch, 0
-    mov dh, 1
-    mov cl, 2       ;初始扇区是cl=1 而不是0
-
-    mov ah, 0x02
-    mov al, 1
-
-    mov bx, oneSecFile
-    mov dl, 0x01
-    int 0x13
-    jnc next_read
-
-    add si, 1
-    cmp si, 5
-
-    jae error_read
-
-    MOV AH,0x00
-    MOV DL,0x01; A驱动器
-    INT 0x13; 重置驱动器
-
-    jmp retry_read
-
-error_read:
-    mov al, ah
-    ;add al ,0x30
-    MOV AH,0x0e
-    int 0x10
-
-    mov ah, 0x0e
-    mov al, ' '
-    int 0x10
-    mov al, 'e'
-    int 0x10
-    mov al, 'r'
-    int 0x10
-    mov al, 'r'
-    int 0x10
-    mov al, ' '
-    int 0x10
-
+IO_BIOS 0, 1, 2, 0x02, 1, oneSecFile, next_read
 next_read:
     
 mov si, 0
@@ -195,7 +225,6 @@ mov bx, oneSecFile
 print_name:
     ;循环判断11个字符，看是不是非目标文件
     ;flag_invalid db 0
-
 
     xor cx, cx
     loop_11:
@@ -329,6 +358,7 @@ log:
     ret
 
 boot:
+    call enter_dir
     call fill_fat
     call read
     ;call format
