@@ -31,6 +31,63 @@ mov ax, 1
 
 %%end:
 %endmacro
+;------------seek file-------
+%macro seek_name 1
+; %1 为输入的文件名的地址
+
+mov si, 0
+mov bx, oneSecFile
+%%seek_name_loop:
+    xor cx, cx
+    %%loop_compare_char:
+        mov di, cx
+
+        mov ah, [%1+di]
+        cmp ah, [bx+di]
+
+        jne %%not_match
+
+        inc cx
+        cmp cx, 11
+        jne %%loop_compare_char
+
+    ;important
+    mov dx, [bx+file.first_clus]
+
+    ;回车换行
+    mov al, 0x0d
+    mov ah, 0x0e
+    int 0x10
+    mov al, 0x0a
+    mov ah, 0x0e
+    int 0x10
+    jmp %%found
+
+    %%not_match:
+
+        add bx, 32
+
+    add si, 1
+    cmp si, 16
+
+    jl %%seek_name_loop
+
+    ;mov al, 'N'
+    ;mov ah, 0x0e
+    ;int 0x10
+    mov al, 0
+    jmp %%end
+%%found:
+    ;mov al, 'Y'
+    ;mov ah, 0x0e
+    ;int 0x10
+    mov al, 1
+%%end:
+
+%endmacro
+;------------seek file end---
+
+
 
 ; ch: %1, dh: %2, cl: %3, ah: %4, al: %5, mem: %6,  next: %7
 %macro IO_BIOS 7
@@ -113,9 +170,89 @@ FAT:
 oneSecFile:
     RESB    0x200
 
-;section .text
-
+command: db "                              "
 jmp boot
+
+input:
+    mov cx, 0
+
+    clear_command:
+    mov di, cx
+    mov byte [command+di], ' '
+    inc cx
+    cmp cx, 30
+    jl clear_command
+
+    mov bx, 0
+get_key:
+    mov ah, 0x00
+    int 0x16
+    
+
+    ;判断回车
+    cmp al, 0x0d
+    je exe_command
+
+    MOV AH,0x0e
+    int 0x10
+    ;存入命令缓冲区
+    mov [command+bx], al
+    inc bx
+
+    jmp get_key
+
+    exe_command:
+        cmp byte [command], 'h'
+        je exe_help
+        cmp byte [command], 'f'
+        je exe_format
+        cmp byte [command], 'o'
+        je exe_open
+        cmp byte [command], 'r'
+        je exe_read
+        cmp byte [command], 'w'
+        je exe_write
+        cmp byte [command], 's'
+        je exe_seek
+        cmp byte [command], 'c'
+        je exe_close
+        cmp byte [command], 'm'
+        je exe_mkdir
+        cmp byte [command], 'd'
+        je exe_deldir
+        cmp byte [command], 'e'
+        je exe_exist
+        cmp byte [command], 'q'
+        je exe_quit
+
+    exe_help:
+        ret
+
+    exe_format:
+        ret
+
+    ; open 表示 cd + ls
+    exe_open:
+        seek_name command+2
+        call cd
+        ret
+
+    exe_read:
+        ret
+    exe_write:
+        ret
+    exe_seek:
+        ret
+    exe_close:
+        ret
+    exe_mkdir:
+        ret
+    exe_deldir:
+        ret
+    exe_exist:
+        ret
+    exe_quit:
+        ret
 
 struc   file
     .dir_name   RESB    11
@@ -199,69 +336,13 @@ workout:
     mov cl, dl
     ret
 ;------------work out end---
-;------------seek file-------
-inputed_filename: db "DIR        "
-seek_name:
 
-mov si, 0
-mov bx, oneSecFile
-seek_name_loop:
-    xor cx, cx
-    loop_compare_char:
-        mov di, cx
-
-        mov ah, [inputed_filename+di]
-        cmp ah, [bx+di]
-
-        jne not_match
-
-        inc cx
-        cmp cx, 11
-        jne loop_compare_char
-
-    ;important
-    mov dx, [bx+file.first_clus]
-
-    ;回车换行
-    mov al, 0x0d
-    mov ah, 0x0e
-    int 0x10
-    mov al, 0x0a
-    mov ah, 0x0e
-    int 0x10
-    jmp found
-
-    not_match:
-        add bx, 32
-
-    add si, 1
-    cmp si, 16
-
-    jl seek_name_loop
-
-    ;mov al, 'N'
-    ;mov ah, 0x0e
-    ;int 0x10
-    mov al, 0
-    ret
-found:
-    ;mov al, 'Y'
-    ;mov ah, 0x0e
-    ;int 0x10
-    mov al, 1
-    ret
-
-;------------seek file end---
-get_key :
-    mov ah,0x00
-    int 0x16 
-    MOV AH,0x0e
-    int 0x10
-    ;jmp get_key
-    ret
 ;------------cd---------------
+cd_name: db "DIR        "
 cd:
-    call seek_name
+    ;seek_name cd_name
+
+
     cmp al, 0
     je cd_blank
     mov ax, dx
@@ -426,15 +507,10 @@ log:
     ret
 
 boot:
-    ;call get_key
-;    call enter_dir
     call read
-    call cd
-    call fill_fat
-    ;call read
-    call seek_name
-    ;call format
-    call log
+main:
+    call input
+    jmp main
 
 fin:
 		HLT
