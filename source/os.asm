@@ -182,6 +182,8 @@ touch_fileContent:
     resb 0x200
 filesize:
     resb 2
+blank:
+    resb 0x200
 
 
 ;--------------read FAT-------------------------
@@ -416,6 +418,19 @@ get_key:
         ret
 
     exe_format:
+        IO_BIOS 0, 0, 1, 0x03, 1, fatContent, writeRoot
+        writeRoot:
+        IO_BIOS 0, 1, 2, 0x03, 1, blank, next_format
+        next_format:
+        call read
+        ;回车换行
+        mov al, 0x0d
+        mov ah, 0x0e
+        int 0x10
+        mov al, 0x0a
+        mov ah, 0x0e
+        int 0x10
+
         ret
 
     ; open 表示 cd + ls
