@@ -175,9 +175,190 @@ fileContent:
     RESB    0x200
 fileSize:
     RESB    2
-
 command: db "                              "
 jmp boot
+touch_filename: db "           "
+touch_fileContent:
+    resb 0x200
+filesize:
+    resb 2
+
+
+;--------------read FAT-------------------------
+read_FAT:
+    IO_BIOS 0, 0, 2, 0x02, 1, FAT, next_read_FAT
+    next_read_FAT:
+    ret
+;--------------read FAT end-------------------------
+;--------------select FAT-------------------------
+oneFAT:
+    resb 2
+fatResult:
+    resb 2
+culNum:
+    resb 2
+readOneFAT:
+    ;簇号位于cx中
+    mov cx, [culNum]
+    push cx
+    mov ax, cx
+    cwd
+    mov cx, 2
+    idiv cx
+
+    pop cx
+    add ax, cx      ;簇号×1.5
+    mov bx, ax
+    mov ax, [FAT+bx]
+    mov [oneFAT], ax
+
+    ; 进行移位操作
+    cmp dx, 0
+    je readOneFAT_odd
+
+    ; 奇数时
+    readOneFAT_even:
+        sar ax, 4
+        mov [fatResult], ax
+        ret
+    ; 偶数时
+    readOneFAT_odd:
+        ;sal ax, 4
+        ;sar ax, 4
+        and ax, 0x0fff
+        mov [fatResult], ax
+    ret
+selectFAT:
+    mov cx, 2
+    loop_FAT:
+        mov [culNum], cx
+        call readOneFAT
+        mov ax, [fatResult]
+        cmp ax, 0
+        je selectFATOn
+
+        inc cx
+        cmp cx, 340
+        jl loop_FAT
+    selectFATOn:
+
+        mov ax, [oneFAT]
+        cmp dx, 0
+        je writeOneFAT_odd
+
+        ; 奇数时
+        writeOneFAT_even:
+            xor ax, 0xfff0
+            jmp afterWriteOneFatSa
+        ; 偶数时
+        writeOneFAT_odd:
+            xor ax, 0x0fff
+        afterWriteOneFatSa:
+            mov [FAT+bx], ax
+            IO_BIOS 0, 0, 2, 0x03, 1, FAT, afterWriteOneFat1
+        afterWriteOneFat1:
+            IO_BIOS 0, 0, 11, 0x03, 1, FAT, afterWriteOneFat2
+        afterWriteOneFat2:
+        ;结束时，簇号在cx中
+    ret
+;--------------select FAT end-------------------------
+;--------------writeOneSecFile-------------------------
+cul: resb 2
+writeOneSecFile:
+    mov ax, cx
+    mov [cul], ax
+
+    mov cx, 0
+    mov bx, oneSecFile
+    findPosWriteSecFile:
+        cmp byte [bx], 0
+        je foundPos
+
+        add bx, 32
+        inc cx
+        cmp cx, 16
+        jl findPosWriteSecFile
+    foundPos:
+        mov cx, 0
+        movNameToSec:
+            mov di, cx
+            mov dl, [touch_filename+di]
+            mov [bx+di], dl
+
+            inc cx
+            cmp cx, 11
+            jl movNameToSec
+        mov [bx+file.first_clus], ax    ;输入簇号
+        mov ax, [filesize]
+        mov [bx+file.file_size], ax     ;输入文件大小
+    IO_BIOS byte [currentDirSector], byte [currentDirSector+1], byte [currentDirSector+2], 0x03, 1, oneSecFile, afterWriteOneFileSec
+    afterWriteOneFileSec:
+
+    ret
+;--------------writeOneSecFile end-------------------------
+;--------------writeContent-------------------------
+writeContent:
+    mov ax, [cul]
+    call workout
+    
+    IO_BIOS ch, dh, cl, 0x03, 1, touch_fileContent, afterWriteContent
+    afterWriteContent:
+
+    ret
+;--------------writeContent end-------------------------
+
+%macro touch 1
+    ;清空以前的数据
+    mov cx, 0
+    mov bx, touch_filename
+    %%clear_name:
+        mov di, cx
+        mov byte [bx+di], ' '
+        inc cx
+        cmp cx, 11
+        jl %%clear_name
+    mov cx, 0
+    mov bx, touch_fileContent
+    %%clear_file:
+        mov di, cx
+        mov byte [bx+di], 0
+        inc cx
+        cmp cx, 0x200
+        jl %%clear_file
+
+    ;将新数据存进去
+    mov bx, touch_filename
+    mov cx, 0
+    %%movByte:
+        mov di, cx
+        cmp byte [%1+di], ' '
+        je %%afterCopyName
+        mov ax, [%1+di]
+        mov [bx+di], ax
+        inc cx
+        jmp %%movByte
+    %%afterCopyName:
+        mov bx, touch_fileContent
+        inc cx
+        mov si, 0
+    %%movContent:
+        mov di, cx
+        cmp byte [%1+di], ' '
+        je %%afterCopyContent
+
+        mov ax, [%1+di]
+        mov [bx+si], ax
+        inc cx
+        inc si
+        jmp %%movContent
+    %%afterCopyContent:
+    mov [filesize], si
+
+    call selectFAT
+    call writeOneSecFile
+    call writeContent
+
+%endmacro
 
 input:
     mov cx, 0
@@ -248,6 +429,14 @@ get_key:
         call cat
         ret
     exe_write:
+        touch command+2
+        ;回车换行
+        mov al, 0x0d
+        mov ah, 0x0e
+        int 0x10
+        mov al, 0x0a
+        mov ah, 0x0e
+        int 0x10
         ret
     exe_seek:
         ret
@@ -346,11 +535,16 @@ workout:
 ;------------work out end---
 
 ;------------cd---------------
+currentDirSector:
+    resb 3
 cd:
     cmp al, 0
     je cd_blank
     mov ax, dx
     call workout
+    mov [currentDirSector], ch
+    mov [currentDirSector+1], dh
+    mov [currentDirSector+2], cl
     IO_BIOS ch, dh, cl, 0x02, 1, oneSecFile, next_read
 
     ret
@@ -422,6 +616,9 @@ enter_dir:
 ;------------read----------------
 ; ch: %1, dh: %2, cl: %3, ah: %4, al: %5, mem: %6,  next: %7
 read:
+    mov byte [currentDirSector], 0
+    mov byte [currentDirSector+1], 1
+    mov byte [currentDirSector+2], 2
     IO_BIOS 0, 1, 2, 0x02, 1, oneSecFile, next_read
 
 next_read:
