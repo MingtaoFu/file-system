@@ -78,6 +78,8 @@ mov bx, oneSecFile
     mov al, 0
     jmp %%end
 %%found:
+    mov ax, [bx+file.file_size]
+    mov [fileSize], ax
     ;mov al, 'Y'
     ;mov ah, 0x0e
     ;int 0x10
@@ -169,6 +171,10 @@ FAT:
 ;-----------------FAT end------
 oneSecFile:
     RESB    0x200
+fileContent:
+    RESB    0x200
+fileSize:
+    RESB    2
 
 command: db "                              "
 jmp boot
@@ -238,6 +244,8 @@ get_key:
         ret
 
     exe_read:
+        seek_name command+2
+        call cat
         ret
     exe_write:
         ret
@@ -261,7 +269,7 @@ struc   file
     .w_time     RESB    2
     .w_date     RESB    2
     .first_clus RESB    2
-    .file_sizw  RESB    4
+    .file_size  RESB    4
     .size:
 endstruc
 
@@ -338,11 +346,7 @@ workout:
 ;------------work out end---
 
 ;------------cd---------------
-cd_name: db "DIR        "
 cd:
-    ;seek_name cd_name
-
-
     cmp al, 0
     je cd_blank
     mov ax, dx
@@ -359,6 +363,52 @@ cd:
     ret
 
 ;------------cd end---------------
+;------------cat---------------
+cat:
+    cmp al, 0
+    je cat_blank
+    mov ax, dx
+    call workout
+    IO_BIOS ch, dh, cl, 0x02, 1, fileContent, read_file
+
+    read_file:
+        mov bx, 0
+        rd_loop:
+            mov al, [fileContent+bx]
+            mov ah, 0x0e
+            int 0x10
+
+            inc bx
+            cmp bx, [fileSize]
+            jl rd_loop
+
+        ;回车换行
+        mov al, 0x0d
+        mov ah, 0x0e
+        int 0x10
+        mov al, 0x0a
+        mov ah, 0x0e
+        int 0x10
+        ret
+        mov ah, 0x03
+        mov bh, 1
+        int 0x10
+
+        mov cx, 0x10
+        mov bp, fileContent
+        mov ax, 0
+        mov es, ax
+        mov ah, 0x13
+        mov al, 1
+        int 0x10
+    ret
+
+    cat_blank:
+        mov al, "B"
+        mov ah, 0x0e
+        int 0x10
+    ret
+;------------cat end---------------
 
 
 ;------------enter dir----------------
