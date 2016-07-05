@@ -391,8 +391,6 @@ get_key:
     jmp get_key
 
     exe_command:
-        cmp byte [command], 'h'
-        je exe_help
         cmp byte [command], 'f'
         je exe_format
         cmp byte [command], 'o'
@@ -401,21 +399,7 @@ get_key:
         je exe_read
         cmp byte [command], 'w'
         je exe_write
-        cmp byte [command], 's'
-        je exe_seek
-        cmp byte [command], 'c'
-        je exe_close
-        cmp byte [command], 'm'
-        je exe_mkdir
-        cmp byte [command], 'd'
-        je exe_deldir
-        cmp byte [command], 'e'
-        je exe_exist
-        cmp byte [command], 'q'
-        je exe_quit
 
-    exe_help:
-        ret
 
     exe_format:
         IO_BIOS 0, 0, 1, 0x03, 1, fatContent, writeRoot
@@ -452,18 +436,6 @@ get_key:
         mov al, 0x0a
         mov ah, 0x0e
         int 0x10
-        ret
-    exe_seek:
-        ret
-    exe_close:
-        ret
-    exe_mkdir:
-        ret
-    exe_deldir:
-        ret
-    exe_exist:
-        ret
-    exe_quit:
         ret
 
 struc   file

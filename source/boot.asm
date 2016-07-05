@@ -1,7 +1,6 @@
-; haribote-ipl
 ; TAB=4
 
-CYLS	EQU		10				; Ç±ÜÅÇÝÞ©
+CYLS	EQU		10				
 
 		ORG		0x7c00			; 指明程序的装载地址
 
@@ -11,7 +10,7 @@ CYLS	EQU		10				; Ç±ÜÅÇÝÞ©
 		DB		0x90
 		DB		"HUSTSOFT"		; 启动区的名称可以是任意字符串（8字节）
 		DW		512				; 每个扇区的大小（必须为512字节）
-		DB		1				; 簇的大小（必须为1字节）
+		DB		1				; 簇的大小（必须为1扇区）
 		DW		1				; FAT的起始位置（一般从第一个扇区开始）
 		DB		2				; FAT的个数（必须为2）
 		DW		224				; 根目录大小（一般设成224项）
@@ -75,7 +74,7 @@ next:
 		CMP		CH,CYLS
 		JB		readloop		; 如果 DH < 2 跳转至 readloop
 
-; ÇÝIíÁœÌÅharibote.sysðÀsŸI
+
 
 		MOV		[0x0ff0],CH		; 注意IPL是我读到的地方
 		JMP		0x8200
@@ -84,22 +83,22 @@ error:
 		MOV		SI,msg
 putloop:
 		MOV		AL,[SI]
-		ADD		SI,1			; SIÉ1ð«·
+		ADD		SI,1			
 		CMP		AL,0
 		JE		fin
-		MOV		AH,0x0e			; ê¶\Št@NV
-		MOV		BX,15			; J[R[h
-		INT		0x10			; rfIBIOSÄÑoµ
+		MOV		AH,0x0e			
+		MOV		BX,15			
+		INT		0x10			
 		JMP		putloop
 fin:
-		HLT						; œ© éÜÅCPUðâ~³¹é
-		JMP		fin				; ³À[v
+		HLT						
+		JMP		fin				
 msg:
 		DB		0x0a, 0x0a		; 换行两次
 		DB		"load error"
 		DB		0x0a			; 换行
 		DB		0
 
-		RESB	0x7dfe-($-$$)		; 0x7dfeÜÅð0x00Åßéœß
+		RESB	0x7dfe-($-$$)		
 
 		DB		0x55, 0xaa
